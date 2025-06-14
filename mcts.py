@@ -1,7 +1,7 @@
 from MCTSNode import MCTSNode
 import random
 
-def mcts(estado, iteracoes=1000):
+def mcts(estado, iteracoes=100):
     
     raiz = MCTSNode(estado)
 

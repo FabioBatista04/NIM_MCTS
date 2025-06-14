@@ -19,28 +19,28 @@ class MCTSNode:
             self.filhos.append(filho)
 
     def selecionar_filho(self):
-    # 1. Prioriza filhos nunca visitados
-    nao_visitados = [f for f in self.filhos if f.visitas == 0]
-    if nao_visitados:
-        return random.choice(nao_visitados)
+        # 1. Prioriza filhos nunca visitados
+        nao_visitados = [f for f in self.filhos if f.visitas == 0]
+        if nao_visitados:
+            return random.choice(nao_visitados)
 
-    # 2. UCB1 do ponto de vista **do pai**  (misère ou normal, tanto faz)
-    C         = math.sqrt(2)
-    log_total = math.log(self.visitas + 1)
+        # 2. UCB1 do ponto de vista **do pai**  (misère ou normal, tanto faz)
+        C         = math.sqrt(2)
+        log_total = math.log(self.visitas + 1)
 
-    melhor_ucb   = -float("inf")
-    melhor_filho = None
+        melhor_ucb   = -float("inf")
+        melhor_filho = None
 
-    for filho in self.filhos:
-        win_oponente = filho.vitorias / filho.visitas          # vitórias do adversário
-        exploit      = 1 - win_oponente                        # vitórias do pai
-        explore      = C * math.sqrt(log_total / filho.visitas)
-        ucb          = exploit + explore
+        for filho in self.filhos:
+            win_oponente = filho.vitorias / filho.visitas          # vitórias do adversário
+            exploit      = 1 - win_oponente                        # vitórias do pai
+            explore      = C * math.sqrt(log_total / filho.visitas)
+            ucb          = exploit + explore
 
-        if ucb > melhor_ucb:
-            melhor_ucb, melhor_filho = ucb, filho
+            if ucb > melhor_ucb:
+                melhor_ucb, melhor_filho = ucb, filho
 
-    return melhor_filho
+        return melhor_filho
 
     def simular(self):
         simulado = self.estado.clone()

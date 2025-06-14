@@ -24,7 +24,7 @@ def show_pilhas(pilhas):
     print("".join(f"{i:^3}" for i in range(len(pilhas))))  # índices
     print("".join(f"{v:^3}" for v in pilhas))              # valores
 
-def jogar_simulacao(num_partidas=100, iteracoes_mcts=2000):
+def jogar_simulacao(num_partidas=100, iteracoes_mcts=50):
     vitorias_j2 = 0                     # contador correto
 
     for _ in range(num_partidas):
