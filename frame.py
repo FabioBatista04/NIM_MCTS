@@ -68,21 +68,10 @@ def abrir_tela():
     while rodando:
         tela.fill(BRANCO)
         mouse = pygame.mouse.get_pos()
-        if not mostrar_botoes:
-            # Texto acima do input
-            instrucao = fonte.render('Informe a quantidade de palitos', True, PRETO)
-            tela.blit(instrucao, (INPUT_RECT.x + 10, INPUT_RECT.y - 40))
-            desenha_input(tela, fonte, INPUT_RECT, 'Total de elementos:', input_ativo, num_elementos, input_buffer, cursor_visivel)
-            # Texto abaixo do input
-            instrucao2 = fonte_menor.render('Confirme pressionando ENTER', True, PRETO)
-            tela.blit(instrucao2, (INPUT_RECT.x + 10, INPUT_RECT.y + INPUT_RECT.height + 10))
+        if not mostrar_botoes and not mostrar_pilhas:
+            desenha_etapa_input(tela, fonte, fonte_menor, input_ativo, num_elementos, input_buffer, cursor_visivel)
         elif not mostrar_pilhas:
-            hover_voce = BOTAO_VOCE.collidepoint(mouse)
-            hover_comp = BOTAO_COMP.collidepoint(mouse)
-            texto = fonte.render('Quem começa o jogo:', True, PRETO)
-            tela.blit(texto, (180, 30))
-            desenha_botao(tela, fonte, BOTAO_VOCE, 'Você', quem_joga==1, hover_voce)
-            desenha_botao(tela, fonte, BOTAO_COMP, 'Computador', quem_joga==2, hover_comp)
+            desenha_etapa_quem_comeca(tela, fonte, mouse, quem_joga)
         else:
             if not pilhas_grafico or sum(pilhas_grafico) != num_elementos:
                 pilhas_grafico = montar_pilhas_grafico(num_elementos)
@@ -159,3 +148,20 @@ def get_quem_joga():
 
 def get_num_elementos():
     return num_elementos
+
+def desenha_etapa_input(tela, fonte, fonte_menor, input_ativo, num_elementos, input_buffer, cursor_visivel):
+    # Texto acima do input
+    instrucao = fonte.render('Informe a quantidade de palitos', True, PRETO)
+    tela.blit(instrucao, (INPUT_RECT.x + 10, INPUT_RECT.y - 40))
+    desenha_input(tela, fonte, INPUT_RECT, 'Total de elementos:', input_ativo, num_elementos, input_buffer, cursor_visivel)
+    # Texto abaixo do input
+    instrucao2 = fonte_menor.render('Confirme pressionando ENTER', True, PRETO)
+    tela.blit(instrucao2, (INPUT_RECT.x + 10, INPUT_RECT.y + INPUT_RECT.height + 10))
+
+def desenha_etapa_quem_comeca(tela, fonte, mouse, quem_joga):
+    hover_voce = BOTAO_VOCE.collidepoint(mouse)
+    hover_comp = BOTAO_COMP.collidepoint(mouse)
+    texto = fonte.render('Quem começa o jogo:', True, PRETO)
+    tela.blit(texto, (180, 30))
+    desenha_botao(tela, fonte, BOTAO_VOCE, 'Você', quem_joga==1, hover_voce)
+    desenha_botao(tela, fonte, BOTAO_COMP, 'Computador', quem_joga==2, hover_comp)
