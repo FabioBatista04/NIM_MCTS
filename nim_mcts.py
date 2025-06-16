@@ -8,6 +8,7 @@
 import random
 from mcts import mcts
 from Estado import Estado
+import frame  # importa o módulo da tela
 
 pilhas = []
 
@@ -106,19 +107,15 @@ def monta_pilhas(quantidade):
                 quantidade = 0
 
 def main():
-    #selecionar_quantidade_elementos = input("Quantas pilhas você quer jogar? (acima de 21): ")
-
-    #quem_joga = input("Quem começa jogando? (1 - você, 2 - computador): ")
-    #try:
-        #quantidade = int(selecionar_quantidade_elementos)
-    #except ValueError:
-        #quantidade = 21
-    #monta_pilhas(quantidade)
-    
-    #show_pilhas(pilhas)
-    
-    #jogar(pilhas, quem_joga)
-    jogar_simulacao()
+    frame.abrir_tela()  # abre a tela branca e seleciona quem_joga e num_elementos
+    quem_joga = frame.get_quem_joga()
+    num_elementos = frame.get_num_elementos()
+    if quem_joga is None:
+        print('Nenhum jogador selecionado. Encerrando.')
+        return
+    monta_pilhas(num_elementos)
+    show_pilhas(pilhas)
+    jogar(pilhas, str(quem_joga))
     
 if __name__ == "__main__":
     main()
