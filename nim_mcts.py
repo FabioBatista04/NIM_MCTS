@@ -1,14 +1,8 @@
-"""
-1. Seleção       
-2. Expansão
-3. Simulação
-4. Backpropagação
-"""
 
 import random
 from mcts import mcts
 from Estado import Estado
-import frame  # importa o módulo da tela
+import frame 
 
 pilhas = []
 
@@ -49,10 +43,10 @@ def jogar_simulacao(num_partidas=100, iteracoes_mcts=50):
     taxa = vitorias_j2 / num_partidas
     print(f"Taxa de vitória do Jogador 2: {vitorias_j2}/{num_partidas}  ({taxa:.2%})")
 
-def jogar(pilhas, quem_joga):
+def jogar_terminal(pilhas, quem_joga):
+    """Versão original do jogo no terminal"""
     while sum(pilhas) > 0:
         if quem_joga == "2":
-
             print("O computador está jogando...")
             estado = Estado(pilhas, 2)
             jogada = mcts(estado, iteracoes=500000)
@@ -107,15 +101,35 @@ def monta_pilhas(quantidade):
                 quantidade = 0
 
 def main():
-    frame.abrir_tela()  # abre a tela branca e seleciona quem_joga e num_elementos
-    quem_joga = frame.get_quem_joga()
-    num_elementos = frame.get_num_elementos()
-    if quem_joga is None:
-        print('Nenhum jogador selecionado. Encerrando.')
-        return
-    monta_pilhas(num_elementos)
-    show_pilhas(pilhas)
-    jogar(pilhas, str(quem_joga))
+    """Executa o jogo com interface gráfica"""
+    print("Iniciando NIM MCTS com interface gráfica...")
+    frame.abrir_tela()  # Toda a lógica do jogo agora está na interface gráfica
+
+def main_simulacao():
+    """Executa simulações para testar a IA"""
+    print("Executando simulações...")
+    jogar_simulacao(num_partidas=100, iteracoes_mcts=1000)
+
+def main_terminal():
+    """Executa o jogo no terminal (versão original)"""
+    print("=== MODO TERMINAL ===")
+    quantidade = int(input("Digite a quantidade total de elementos: "))
+    quem_joga = input("Quem começa? (1=Você, 2=Computador): ")
     
+    monta_pilhas(quantidade)
+    show_pilhas(pilhas)
+    jogar_terminal(pilhas, quem_joga)
+
 if __name__ == "__main__":
-    main()
+    # Opções de execução
+    modo = input("Escolha o modo:\n1 - Interface Gráfica\n2 - Terminal\n3 - Simulação\nOpção: ")
+    
+    if modo == "1":
+        main()
+    elif modo == "2":
+        main_terminal()
+    elif modo == "3":
+        main_simulacao()
+    else:
+        print("Modo inválido. Executando interface gráfica...")
+        main()
