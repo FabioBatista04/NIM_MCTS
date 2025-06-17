@@ -372,21 +372,21 @@ def inicializar_jogo():
     print(f"Primeiro jogador: {quem_joga}")
 
 def montar_pilhas_grafico(quantidade):
+    if quantidade > 80:
+        quantidade = 80
     if quantidade < 21:
         return [1, 2, 3, 5, 7]
     else:
         acrescimo = 2
         current = 5
         pilhas = [1, 2, 3, 5]
-        quantidade -= 11
+                
         while quantidade > 0:
-            if quantidade > current + acrescimo:
-                pilhas.append(current + acrescimo)
-                quantidade -= current + acrescimo
-                current += acrescimo
-            else:
-                pilhas[-1] += quantidade
-                quantidade = 0
+            import random
+            elementos_pilha = random.randint(5, 10)  # Elementos randômicos entre 5 e 10
+            pilhas.append(elementos_pilha)
+            quantidade -= elementos_pilha
+            
         return pilhas
 
 def get_quem_joga():
