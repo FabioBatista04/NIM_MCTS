@@ -379,11 +379,14 @@ def montar_pilhas_grafico(quantidade):
     else:
         acrescimo = 2
         current = 5
-        pilhas = [1, 2, 3, 5]
+        pilhas = []
                 
         while quantidade > 0:
             import random
-            elementos_pilha = random.randint(5, 10)  # Elementos randômicos entre 5 e 10
+            if quantidade < 10:
+                elementos_pilha = quantidade
+            else:
+                elementos_pilha = random.randint(5, 10)  # Elementos randômicos entre 5 e 10
             pilhas.append(elementos_pilha)
             quantidade -= elementos_pilha
             
