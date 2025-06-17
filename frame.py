@@ -9,7 +9,7 @@ CINZA = (200, 200, 200)
 AZUL = (100, 149, 237)
 CINZA_ESCURO = (150, 150, 150)
 BORDACOR = (50, 50, 50)
-VERDE = (0, 255, 0)
+VERDE = (34, 139, 34)  # Verde mais suave para melhor visualização
 VERMELHO = (255, 0, 0)
 
 # Botão: (x, y, largura, altura)
@@ -30,6 +30,8 @@ estado_jogo = None
 jogador_atual = 1
 mensagem_status = ""
 vencedor = None
+ia_pensando = False
+timer_ia = 0
 
 def desenha_botao(tela, fonte, rect, texto, selecionado, hover):
     cor = AZUL if selecionado else (CINZA_ESCURO if hover else CINZA)
@@ -91,24 +93,17 @@ def desenha_pilhas(tela, pilhas, base_x=100, base_y=350, largura=40, altura=25):
         # Desenha os elementos da pilha
         for h in range(valor):
             x = base_x + idx * largura
-            y = base_y - h * altura
+            y = base_y - h * altura            # Define cor baseada no estado
+            cor_elemento = AZUL  # Cor padrão dos elementos (mudou de PRETO para AZUL)
+            cor_borda = AZUL  # Borda azul para elementos azuis
             
-            # Define cor baseada no estado
-            cor_elemento = PRETO
-            cor_borda = BORDACOR
-            
-            if idx == pilha_selecionada:
-                cor_elemento = VERMELHO  # Pilha selecionada para jogada
-                cor_borda = VERMELHO
-            elif mouse_sobre_esta_pilha and elementos_destacados_nesta_pilha > 0:
+            if mouse_sobre_esta_pilha and elementos_destacados_nesta_pilha > 0:
                 # Destaca elementos de cima para baixo
                 elementos_do_topo = valor - h
                 if elementos_do_topo <= elementos_destacados_nesta_pilha:
-                    cor_elemento = AZUL  # Elementos que serão removidos
-                    cor_borda = AZUL
-                else:
-                    cor_elemento = CINZA_ESCURO  # Elementos que ficarão
-                    cor_borda = CINZA_ESCURO
+                    cor_elemento = VERDE  # Elementos que serão removidos (mudou de AZUL para VERDE)
+                    cor_borda = VERDE
+                # Removido o else que mudava a cor dos elementos que ficarão
             
             # Desenha o círculo com borda para melhor visualização
             pygame.draw.circle(tela, cor_elemento, (x, y), 12)
@@ -140,10 +135,19 @@ def get_pilha_e_quantidade_mouse(pilhas, mouse_x, mouse_y, base_x=100, base_y=35
     return -1, 0
 
 def fazer_jogada_ia():
-    global estado_jogo, jogador_atual, mensagem_status
+    global estado_jogo, jogador_atual, mensagem_status, ia_pensando, timer_ia
     
-    print("IA está pensando...")
-    mensagem_status = "IA está pensando..."
+    if not ia_pensando:
+        # Inicia o timer de "pensamento"
+        ia_pensando = True
+        timer_ia = 0
+        mensagem_status = "IA está pensando..."
+        print("IA está pensando...")
+        return
+    
+    # IA já terminou de "pensar", faz a jogada
+    print("IA fazendo jogada...")
+    mensagem_status = "IA fazendo jogada..."
     
     # Usar MCTS para escolher a melhor jogada
     jogada = mcts(estado_jogo.clone(), iteracoes=100)
@@ -155,6 +159,10 @@ def fazer_jogada_ia():
     # Aplicar a jogada
     estado_jogo.aplicar_jogada(jogada)
     jogador_atual = estado_jogo.jogador_atual()
+    
+    # Resetar estado da IA
+    ia_pensando = False
+    timer_ia = 0
 
 def verificar_fim_jogo():
     global estado_atual, vencedor, mensagem_status
@@ -164,7 +172,7 @@ def verificar_fim_jogo():
         estado_atual = ESTADO_FIM_JOGO
         
         # No NIM misère, quem faz a última jogada perde
-        if vencedor == 1:
+        if vencedor == 2:
             mensagem_status = "Você perdeu! Fez a última jogada."
         else:
             mensagem_status = "Você ganhou! A IA fez a última jogada."
@@ -181,6 +189,7 @@ input_buffer = ''
 def abrir_tela():
     global quem_joga, num_elementos, input_ativo, input_buffer, pilha_selecionada
     global estado_atual, estado_jogo, jogador_atual, mensagem_status, vencedor
+    global ia_pensando, timer_ia
     
     pygame.init()
     tela = pygame.display.set_mode((600, 400))
@@ -191,12 +200,13 @@ def abrir_tela():
     cursor_timer = 0
     cursor_visivel = True
     clock = pygame.time.Clock()
-    
-    # Reset das variáveis
+      # Reset das variáveis
     pilha_selecionada = -1
     estado_atual = ESTADO_INPUT
     mensagem_status = ""
     vencedor = None
+    ia_pensando = False
+    timer_ia = 0
     
     while rodando:
         tela.fill(BRANCO)
@@ -260,13 +270,18 @@ def abrir_tela():
             
             elif estado_atual == ESTADO_JOGO:
                 processar_eventos_jogo(evento)
-        
-        # Lógica do jogo
+          # Lógica do jogo
         if estado_atual == ESTADO_JOGO and estado_jogo:
             # Se é a vez da IA e o jogo não acabou
             if jogador_atual == 2 and not estado_jogo.fim_de_jogo():
-                fazer_jogada_ia()
-                verificar_fim_jogo()
+                if ia_pensando:
+                    # Incrementa o timer da IA
+                    timer_ia += clock.get_time()
+                    if timer_ia >= 4000:  # 4 segundos em milissegundos
+                        fazer_jogada_ia()  # Agora faz a jogada de verdade
+                        verificar_fim_jogo()
+                else:
+                    fazer_jogada_ia()  # Inicia o processo de "pensamento"
         
         # Cursor piscando
         if input_ativo:
