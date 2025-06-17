@@ -20,13 +20,11 @@ BOTAO_COMP = pygame.Rect(360, 80, 170, 50)
 ESTADO_INPUT = 0
 ESTADO_SELECAO_JOGADOR = 1
 ESTADO_JOGO = 2
-ESTADO_SELECAO_QUANTIDADE = 3
-ESTADO_FIM_JOGO = 4
+ESTADO_FIM_JOGO = 3
 
 # Variáveis globais do jogo
 quem_joga = None
 pilha_selecionada = -1
-quantidade_selecionada = 0
 estado_atual = ESTADO_INPUT
 estado_jogo = None
 jogador_atual = 1
@@ -61,56 +59,85 @@ def desenha_pilhas(tela, pilhas, base_x=100, base_y=350, largura=40, altura=25):
     fonte_menor = pygame.font.SysFont(None, 18)
     mouse_x, mouse_y = pygame.mouse.get_pos()
     
+    mouse_sobre_pilha = False
+    elementos_destacados = 0
+    
     for idx, valor in enumerate(pilhas):
         if valor == 0:
             continue
             
         # Desenha número da coluna abaixo da pilha
-        coluna_txt = fonte_menor.render(f"{idx}", True, PRETO)
-        tela.blit(coluna_txt, (base_x + idx * largura - 5, base_y + 15))
+        coluna_txt = fonte_menor.render(f"P{idx}", True, PRETO)
+        tela.blit(coluna_txt, (base_x + idx * largura - 8, base_y + 20))
         
         # Verifica se o mouse está sobre esta pilha
         pilha_x = base_x + idx * largura
-        mouse_sobre_pilha = abs(mouse_x - pilha_x) < 20
+        mouse_sobre_esta_pilha = abs(mouse_x - pilha_x) < 20
         
-        # Define cor com base na seleção e posição do mouse
-        cor_atual = PRETO
-        if idx == pilha_selecionada:
-            cor_atual = VERMELHO  # Vermelho para pilha selecionada
-        elif mouse_sobre_pilha:
-            cor_atual = AZUL  # Azul quando mouse está sobre a pilha
+        if mouse_sobre_esta_pilha:
+            mouse_sobre_pilha = True
+        
+        # Calcula quantos elementos estão sendo destacados baseado na posição Y do mouse
+        elementos_destacados_nesta_pilha = 0
+        if mouse_sobre_esta_pilha and mouse_y <= base_y + 15:  # Margem para clique
+            # Calcula qual elemento está mais próximo do mouse (de cima para baixo)
+            for h in range(valor - 1, -1, -1):  # Do topo para a base
+                elemento_y = base_y - h * altura
+                if mouse_y <= elemento_y + 15:  # +15 para dar uma margem maior de clique
+                    elementos_destacados_nesta_pilha = valor - h
+                    elementos_destacados = elementos_destacados_nesta_pilha
+                    break
         
         # Desenha os elementos da pilha
         for h in range(valor):
             x = base_x + idx * largura
             y = base_y - h * altura
-            pygame.draw.circle(tela, cor_atual, (x, y), 10)
+            
+            # Define cor baseada no estado
+            cor_elemento = PRETO
+            cor_borda = BORDACOR
+            
+            if idx == pilha_selecionada:
+                cor_elemento = VERMELHO  # Pilha selecionada para jogada
+                cor_borda = VERMELHO
+            elif mouse_sobre_esta_pilha and elementos_destacados_nesta_pilha > 0:
+                # Destaca elementos de cima para baixo
+                elementos_do_topo = valor - h
+                if elementos_do_topo <= elementos_destacados_nesta_pilha:
+                    cor_elemento = AZUL  # Elementos que serão removidos
+                    cor_borda = AZUL
+                else:
+                    cor_elemento = CINZA_ESCURO  # Elementos que ficarão
+                    cor_borda = CINZA_ESCURO
+            
+            # Desenha o círculo com borda para melhor visualização
+            pygame.draw.circle(tela, cor_elemento, (x, y), 12)
+            pygame.draw.circle(tela, cor_borda, (x, y), 12, 2)
+            
+        # Desenha a quantidade de elementos na pilha
+        qtd_txt = fonte_menor.render(f"({valor})", True, PRETO)
+        tela.blit(qtd_txt, (base_x + idx * largura - 12, base_y + 35))
+    
+    return mouse_sobre_pilha, elementos_destacados
 
-def desenha_botoes_quantidade(tela, fonte, pilha_selecionada, pilhas):
-    if pilha_selecionada == -1 or pilha_selecionada >= len(pilhas):
-        return []
-    
-    max_quantidade = pilhas[pilha_selecionada]
-    botoes = []
-    
-    # Desenha botões para cada quantidade possível
-    for i in range(1, min(max_quantidade + 1, 6)):  # Máximo 5 botões
-        x = 50 + (i - 1) * 100
-        y = 50
-        rect = pygame.Rect(x, y, 80, 40)
-        botoes.append((rect, i))
+def get_pilha_e_quantidade_mouse(pilhas, mouse_x, mouse_y, base_x=100, base_y=350, largura=40, altura=25):
+    """Retorna a pilha e quantidade de elementos baseado na posição do mouse"""
+    for idx, valor in enumerate(pilhas):
+        if valor == 0:
+            continue
+            
+        pilha_x = base_x + idx * largura
+        mouse_sobre_pilha = abs(mouse_x - pilha_x) < 20
         
-        mouse_pos = pygame.mouse.get_pos()
-        hover = rect.collidepoint(mouse_pos)
-        
-        cor = CINZA_ESCURO if hover else CINZA
-        pygame.draw.rect(tela, cor, rect, border_radius=5)
-        pygame.draw.rect(tela, BORDACOR, rect, 2, border_radius=5)
-        
-        txt = fonte.render(str(i), True, PRETO)
-        tela.blit(txt, (rect.x + (rect.width-txt.get_width())//2, rect.y + (rect.height-txt.get_height())//2))
+        if mouse_sobre_pilha and mouse_y <= base_y + 15:
+            # Calcula quantos elementos serão removidos
+            for h in range(valor - 1, -1, -1):  # Do topo para a base
+                elemento_y = base_y - h * altura
+                if mouse_y <= elemento_y + 15:
+                    quantidade = valor - h
+                    return idx, quantidade
     
-    return botoes
+    return -1, 0
 
 def fazer_jogada_ia():
     global estado_jogo, jogador_atual, mensagem_status
@@ -153,7 +180,7 @@ input_buffer = ''
 
 def abrir_tela():
     global quem_joga, num_elementos, input_ativo, input_buffer, pilha_selecionada
-    global estado_atual, estado_jogo, jogador_atual, mensagem_status, quantidade_selecionada, vencedor
+    global estado_atual, estado_jogo, jogador_atual, mensagem_status, vencedor
     
     pygame.init()
     tela = pygame.display.set_mode((600, 400))
@@ -164,7 +191,6 @@ def abrir_tela():
     cursor_timer = 0
     cursor_visivel = True
     clock = pygame.time.Clock()
-    botoes_quantidade = []
     
     # Reset das variáveis
     pilha_selecionada = -1
@@ -186,30 +212,23 @@ def abrir_tela():
         elif estado_atual == ESTADO_JOGO:
             # Desenha as pilhas
             pilhas_atuais = estado_jogo.pilhas
-            desenha_pilhas(tela, pilhas_atuais)
+            mouse_sobre_pilha, elementos_destacados = desenha_pilhas(tela, pilhas_atuais)
             
             # Desenha informações do jogo
             if jogador_atual == 1:
-                instrucao_txt = fonte_menor.render("Sua vez! Clique em uma pilha", True, PRETO)
+                if mouse_sobre_pilha and elementos_destacados > 0:
+                    pilha_idx, _ = get_pilha_e_quantidade_mouse(pilhas_atuais, mouse[0], mouse[1])
+                    instrucao_txt = fonte_menor.render(f"Remover {elementos_destacados} elemento(s) da pilha {pilha_idx} - Clique para confirmar", True, PRETO)
+                else:
+                    instrucao_txt = fonte_menor.render("Sua vez! Passe o mouse sobre uma pilha e clique para jogar", True, PRETO)
             else:
                 instrucao_txt = fonte_menor.render("Vez da IA", True, PRETO)
-            tela.blit(instrucao_txt, (180, 30))
+            tela.blit(instrucao_txt, (50, 30))
             
             # Desenha mensagem de status
             if mensagem_status:
                 status_txt = fonte_menor.render(mensagem_status, True, PRETO)
                 tela.blit(status_txt, (50, 10))
-        
-        elif estado_atual == ESTADO_SELECAO_QUANTIDADE:
-            # Desenha as pilhas
-            pilhas_atuais = estado_jogo.pilhas
-            desenha_pilhas(tela, pilhas_atuais)
-            
-            # Desenha botões de quantidade
-            instrucao_txt = fonte_menor.render(f"Quantos elementos remover da pilha {pilha_selecionada}?", True, PRETO)
-            tela.blit(instrucao_txt, (50, 30))
-            
-            botoes_quantidade = desenha_botoes_quantidade(tela, fonte_menor, pilha_selecionada, pilhas_atuais)
         
         elif estado_atual == ESTADO_FIM_JOGO:
             # Desenha as pilhas vazias
@@ -241,9 +260,6 @@ def abrir_tela():
             
             elif estado_atual == ESTADO_JOGO:
                 processar_eventos_jogo(evento)
-            
-            elif estado_atual == ESTADO_SELECAO_QUANTIDADE:
-                processar_eventos_selecao_quantidade(evento, botoes_quantidade)
         
         # Lógica do jogo
         if estado_atual == ESTADO_JOGO and estado_jogo:
@@ -303,49 +319,27 @@ def processar_eventos_selecao_jogador(evento):
             inicializar_jogo()
 
 def processar_eventos_jogo(evento):
-    global pilha_selecionada, estado_atual
-    
-    if evento.type == pygame.MOUSEBUTTONDOWN and jogador_atual == 1:
-        # Verificar clique nas pilhas
-        base_x = 100
-        largura = 40
-        mouse_x, mouse_y = evento.pos
-        
-        # Calcular qual pilha foi clicada
-        pilhas_atuais = estado_jogo.pilhas
-        for i, quantidade in enumerate(pilhas_atuais):
-            if quantidade == 0:  # Pular pilhas vazias
-                continue
-                
-            pilha_x = base_x + i * largura
-            if abs(mouse_x - pilha_x) < 20:
-                pilha_selecionada = i
-                estado_atual = ESTADO_SELECAO_QUANTIDADE
-                print(f"Pilha {i} selecionada com {quantidade} elementos")
-                break
-
-def processar_eventos_selecao_quantidade(evento, botoes_quantidade):
     global pilha_selecionada, estado_atual, jogador_atual, mensagem_status
     
-    if evento.type == pygame.MOUSEBUTTONDOWN:
-        # Verificar clique nos botões de quantidade
-        for rect, quantidade in botoes_quantidade:
-            if rect.collidepoint(evento.pos):
-                # Fazer a jogada
-                jogada = (pilha_selecionada, quantidade)
-                estado_jogo.aplicar_jogada(jogada)
-                
-                mensagem_status = f"Você removeu {quantidade} da pilha {pilha_selecionada}"
-                print(f"Jogada aplicada: {jogada}")
-                
-                # Resetar seleção
-                pilha_selecionada = -1
-                jogador_atual = estado_jogo.jogador_atual()
-                estado_atual = ESTADO_JOGO
-                
-                # Verificar fim de jogo
-                verificar_fim_jogo()
-                break
+    if evento.type == pygame.MOUSEBUTTONDOWN and jogador_atual == 1:
+        # Obter a pilha e quantidade baseada na posição do mouse
+        mouse_x, mouse_y = evento.pos
+        pilha_idx, quantidade = get_pilha_e_quantidade_mouse(estado_jogo.pilhas, mouse_x, mouse_y)
+        
+        if pilha_idx != -1 and quantidade > 0:
+            # Fazer a jogada
+            jogada = (pilha_idx, quantidade)
+            estado_jogo.aplicar_jogada(jogada)
+            
+            mensagem_status = f"Você removeu {quantidade} elemento(s) da pilha {pilha_idx}"
+            print(f"Jogada aplicada: {jogada}")
+            
+            # Resetar seleção
+            pilha_selecionada = -1
+            jogador_atual = estado_jogo.jogador_atual()
+            
+            # Verificar fim de jogo
+            verificar_fim_jogo()
 
 def inicializar_jogo():
     global estado_jogo, estado_atual
