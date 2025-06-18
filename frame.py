@@ -1,6 +1,7 @@
 import pygame
 from Estado import Estado
-from mcts import mcts
+from mcts import mcts, get_quantidade_de_buscas, quantidade_media_buscas, get_profundidade_media, reset_quantidade_de_buscas, reset_quantidade_de_execucao, reset_profundidade_buscas
+from MCTSNode import MCTSNode
 
 # Cores
 BRANCO = (255, 255, 255)
@@ -170,7 +171,20 @@ def verificar_fim_jogo():
     if estado_jogo.fim_de_jogo():
         vencedor = estado_jogo.vencedor()
         estado_atual = ESTADO_FIM_JOGO
-        
+        print(f"Profundidade máxima alcançada: {MCTSNode.get_profundidade_maxima()}")
+        print(f"Profundidade média da Arvore: {MCTSNode.get_profundidade_media()}")
+        print(f"Quantidade de buscas: {get_quantidade_de_buscas()}")
+        print(f"Quantidade média de buscas: {quantidade_media_buscas()}")
+        print(f"Profundidade média das buscas: {get_profundidade_media()}")
+
+        MCTSNode.resetar_profundidade_maxima()  # Reseta a profundidade máxima para o próximo jogo
+        MCTSNode.resetar_profundidade_total_iterada()  # Reseta a profundidade total iterada para o próximo jogo
+        MCTSNode.resetar_nos_criados()  # Reseta o número de nós criados para o próximo jogo
+        reset_quantidade_de_buscas()
+        reset_quantidade_de_execucao()
+        reset_profundidade_buscas()
+
+
         # No NIM misère, quem faz a última jogada perde
         if vencedor == 2:
             mensagem_status = "Você perdeu! Fez a última jogada."
@@ -277,7 +291,7 @@ def abrir_tela():
                 if ia_pensando:
                     # Incrementa o timer da IA
                     timer_ia += clock.get_time()
-                    if timer_ia >= 4000:  # 4 segundos em milissegundos
+                    if timer_ia >= 1000:  # 4 segundos em milissegundos
                         fazer_jogada_ia()  # Agora faz a jogada de verdade
                         verificar_fim_jogo()
                 else:
@@ -374,8 +388,8 @@ def inicializar_jogo():
 def montar_pilhas_grafico(quantidade):
     if quantidade > 80:
         quantidade = 80
-    if quantidade < 21:
-        return [1, 2, 3, 5, 7]
+    if quantidade < 6:
+        return [1, 2, 3]  # Pilhas fixas para valores baixos
     else:
         acrescimo = 2
         current = 5

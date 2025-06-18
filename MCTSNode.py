@@ -2,6 +2,9 @@ import random
 import math
 
 class MCTSNode:
+    profundidade_maxima = 0
+    profundidade_total_iterada = 0
+    nos_criados = 0
     def __init__(self, estado, pai=None, jogada=None):
         self.estado = estado
         self.pai = pai
@@ -9,6 +12,11 @@ class MCTSNode:
         self.filhos = []
         self.visitas = 0
         self.vitorias = 0
+        self.profundidade = 0 if pai is None else pai.profundidade + 1
+
+        MCTSNode.profundidade_maxima = max(MCTSNode.profundidade_maxima, self.profundidade)
+        MCTSNode.nos_criados += 1
+        MCTSNode.profundidade_total_iterada += self.profundidade
 
     def expandir(self):
         jogadas_possiveis = self.estado.jogadas_possiveis()
@@ -67,3 +75,29 @@ class MCTSNode:
             # O resultado para o pai é o oposto do resultado para o filho
             # Se o filho venceu (resultado=1), o pai perdeu (1-resultado=0)
             self.pai.backpropagar(1 - resultado)
+
+    @classmethod
+    def resetar_profundidade_maxima(cls):
+        cls.profundidade_maxima = 0
+
+    @classmethod
+    def get_profundidade_maxima(cls):
+        return cls.profundidade_maxima
+    
+    @classmethod
+    def get_profundidade_media(cls):
+        if cls.nos_criados == 0:
+            return 0
+        return cls.profundidade_total_iterada / cls.nos_criados
+    
+    @classmethod
+    def get_nos_criados(cls):
+        return cls.nos_criados
+        
+    @classmethod
+    def resetar_nos_criados(cls):
+        cls.nos_criados = 0
+
+    @classmethod
+    def resetar_profundidade_total_iterada(cls):
+        cls.profundidade_total_iterada = 0
