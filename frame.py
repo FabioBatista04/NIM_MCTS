@@ -1,430 +1,194 @@
 import pygame
+import time
+import random
 from Estado import Estado
 from mcts import mcts, get_quantidade_de_buscas, quantidade_media_buscas, get_profundidade_media, reset_quantidade_de_buscas, reset_quantidade_de_execucao, reset_profundidade_buscas
 from MCTSNode import MCTSNode
 
-# Cores
-BRANCO = (255, 255, 255)
-PRETO = (0, 0, 0)
-CINZA = (200, 200, 200)
-AZUL = (100, 149, 237)
-CINZA_ESCURO = (150, 150, 150)
-BORDACOR = (50, 50, 50)
-VERDE = (34, 139, 34)  # Verde mais suave para melhor visualização
-VERMELHO = (255, 0, 0)
+# Cores e fontes
+BRANCO, PRETO, CINZA, AZUL, VERDE, VERMELHO = (255,255,255), (0,0,0), (200,200,200), (100,149,237), (34,139,34), (255,0,0)
 
-# Botão: (x, y, largura, altura)
-BOTAO_VOCE = pygame.Rect(120, 80, 120, 50)
-BOTAO_COMP = pygame.Rect(360, 80, 170, 50)
+class JogoNim:
+    def __init__(self):
+        pygame.init()
+        self.tela = pygame.display.set_mode((600, 400))
+        pygame.display.set_caption('NIM MCTS')
+        self.fonte = pygame.font.SysFont(None, 32)
+        self.fonte_pequena = pygame.font.SysFont(None, 24)
+        self.clock = pygame.time.Clock()
+        self.reiniciar_jogo()
 
-# Estados do jogo
-ESTADO_INPUT = 0
-ESTADO_SELECAO_JOGADOR = 1
-ESTADO_JOGO = 2
-ESTADO_FIM_JOGO = 3
+    def reiniciar_jogo(self):
+        self.num_elementos = 11
+        self.estado_jogo = None
+        self.jogador_atual = 1
+        self.mensagem = ""
+        self.estado = "input"
+        self.input_ativo = False
+        self.input_buffer = ""
 
-# Variáveis globais do jogo
-quem_joga = None
-pilha_selecionada = -1
-estado_atual = ESTADO_INPUT
-estado_jogo = None
-jogador_atual = 1
-mensagem_status = ""
-vencedor = None
-ia_pensando = False
-timer_ia = 0
+    def desenhar_texto(self, texto, pos, cor=PRETO, fonte=None, centro=False):
+        if fonte is None: fonte = self.fonte_pequena
+        surface = fonte.render(texto, True, cor)
+        rect = surface.get_rect(center=pos) if centro else surface.get_rect(topleft=pos)
+        self.tela.blit(surface, rect)
 
-def desenha_botao(tela, fonte, rect, texto, selecionado, hover):
-    cor = AZUL if selecionado else (CINZA_ESCURO if hover else CINZA)
-    pygame.draw.rect(tela, cor, rect, border_radius=8)
-    pygame.draw.rect(tela, BORDACOR, rect, 2, border_radius=8)
-    txt = fonte.render(texto, True, PRETO)
-    tela.blit(txt, (rect.x + (rect.width-txt.get_width())//2, rect.y + (rect.height-txt.get_height())//2))
+    def desenhar_botao(self, rect, texto):
+        mouse_pos = pygame.mouse.get_pos()
+        hover = rect.collidepoint(mouse_pos)
+        cor = AZUL if hover else CINZA
+        pygame.draw.rect(self.tela, cor, rect, border_radius=8)
+        pygame.draw.rect(self.tela, PRETO, rect, 2, border_radius=8)
+        self.desenhar_texto(texto, rect.center, fonte=self.fonte, centro=True)
+        return hover
 
-def desenha_input(tela, fonte, rect, texto, ativo, valor, buffer, cursor_visivel):
-    cor = AZUL if ativo else CINZA
-    pygame.draw.rect(tela, cor, rect, border_radius=8)
-    pygame.draw.rect(tela, BORDACOR, rect, 2, border_radius=8)
-    txt = fonte.render(texto, True, PRETO)
-    tela.blit(txt, (rect.x + 10, rect.y + 5))
-    if ativo:
-        mostrar = buffer
-        if cursor_visivel:
-            mostrar += "|"
-    else:
-        mostrar = str(valor)
-    valor_txt = fonte.render(mostrar, True, PRETO)
-    tela.blit(valor_txt, (rect.x + rect.width - valor_txt.get_width() - 10, rect.y + 5))
-
-def desenha_pilhas(tela, pilhas, base_x=100, base_y=350, largura=40, altura=25):
-    global pilha_selecionada
-    max_altura = max(pilhas) if pilhas else 0
-    fonte_menor = pygame.font.SysFont(None, 18)
-    mouse_x, mouse_y = pygame.mouse.get_pos()
-    
-    mouse_sobre_pilha = False
-    elementos_destacados = 0
-    
-    for idx, valor in enumerate(pilhas):
-        if valor == 0:
-            continue
-            
-        # Desenha número da coluna abaixo da pilha
-        coluna_txt = fonte_menor.render(f"P{idx}", True, PRETO)
-        tela.blit(coluna_txt, (base_x + idx * largura - 8, base_y + 20))
+    def desenhar_pilhas(self):
+        if not self.estado_jogo: return None, 0
+        mouse_x, mouse_y = pygame.mouse.get_pos()
+        pilha_clicada, quantidade_selecionada = None, 0
         
-        # Verifica se o mouse está sobre esta pilha
-        pilha_x = base_x + idx * largura
-        mouse_sobre_esta_pilha = abs(mouse_x - pilha_x) < 20
-        
-        if mouse_sobre_esta_pilha:
-            mouse_sobre_pilha = True
-        
-        # Calcula quantos elementos estão sendo destacados baseado na posição Y do mouse
-        elementos_destacados_nesta_pilha = 0
-        if mouse_sobre_esta_pilha and mouse_y <= base_y + 15:  # Margem para clique
-            # Calcula qual elemento está mais próximo do mouse (de cima para baixo)
-            for h in range(valor - 1, -1, -1):  # Do topo para a base
-                elemento_y = base_y - h * altura
-                if mouse_y <= elemento_y + 15:  # +15 para dar uma margem maior de clique
-                    elementos_destacados_nesta_pilha = valor - h
-                    elementos_destacados = elementos_destacados_nesta_pilha
-                    break
-        
-        # Desenha os elementos da pilha
-        for h in range(valor):
-            x = base_x + idx * largura
-            y = base_y - h * altura            # Define cor baseada no estado
-            cor_elemento = AZUL  # Cor padrão dos elementos (mudou de PRETO para AZUL)
-            cor_borda = AZUL  # Borda azul para elementos azuis
+        for i, tamanho in enumerate(self.estado_jogo.pilhas):
+            if tamanho == 0: continue
+            x_pilha = 70 + i * 80
+            mouse_sobre_pilha = abs(mouse_x - x_pilha) < 30
             
-            if mouse_sobre_esta_pilha and elementos_destacados_nesta_pilha > 0:
-                # Destaca elementos de cima para baixo
-                elementos_do_topo = valor - h
-                if elementos_do_topo <= elementos_destacados_nesta_pilha:
-                    cor_elemento = VERDE  # Elementos que serão removidos (mudou de AZUL para VERDE)
-                    cor_borda = VERDE
-                # Removido o else que mudava a cor dos elementos que ficarão
+            elementos_destacados = 0
+            if mouse_sobre_pilha:
+                # Itera de baixo para cima (na tela) para encontrar o item sob o mouse
+                for j in range(tamanho - 1, -1, -1):
+                    y = 300 - j * 25
+                    if mouse_y <= y + 12: # 12 é o raio
+                        elementos_destacados = tamanho - j
+                        break
             
-            # Desenha o círculo com borda para melhor visualização
-            pygame.draw.circle(tela, cor_elemento, (x, y), 12)
-            pygame.draw.circle(tela, cor_borda, (x, y), 12, 2)
-            
-        # Desenha a quantidade de elementos na pilha
-        qtd_txt = fonte_menor.render(f"({valor})", True, PRETO)
-        tela.blit(qtd_txt, (base_x + idx * largura - 12, base_y + 35))
-    
-    return mouse_sobre_pilha, elementos_destacados
+            if mouse_sobre_pilha and elementos_destacados > 0:
+                pilha_clicada = i
+                quantidade_selecionada = elementos_destacados
 
-def get_pilha_e_quantidade_mouse(pilhas, mouse_x, mouse_y, base_x=100, base_y=350, largura=40, altura=25):
-    """Retorna a pilha e quantidade de elementos baseado na posição do mouse"""
-    for idx, valor in enumerate(pilhas):
-        if valor == 0:
-            continue
+            for j in range(tamanho):
+                y = 300 - j * 25
+                # Destaca se o elemento está na faixa a ser removida
+                destacar = (mouse_sobre_pilha and (tamanho - j) <= elementos_destacados)
+                cor = VERDE if destacar else AZUL
+                pygame.draw.circle(self.tela, cor, (x_pilha, y), 12) # Raio 12
+                pygame.draw.circle(self.tela, PRETO, (x_pilha, y), 12, 2)
             
-        pilha_x = base_x + idx * largura
-        mouse_sobre_pilha = abs(mouse_x - pilha_x) < 20
-        
-        if mouse_sobre_pilha and mouse_y <= base_y + 15:
-            # Calcula quantos elementos serão removidos
-            for h in range(valor - 1, -1, -1):  # Do topo para a base
-                elemento_y = base_y - h * altura
-                if mouse_y <= elemento_y + 15:
-                    quantidade = valor - h
-                    return idx, quantidade
-    
-    return -1, 0
+            self.desenhar_texto(f"P{i} ({tamanho})", (x_pilha - 20, 325))
+        return pilha_clicada, quantidade_selecionada
 
-def fazer_jogada_ia():
-    global estado_jogo, jogador_atual, mensagem_status, ia_pensando, timer_ia
-    
-    if not ia_pensando:
-        # Inicia o timer de "pensamento"
-        ia_pensando = True
-        timer_ia = 0
-        mensagem_status = "IA está pensando..."
-        print("IA está pensando...")
-        return
-    
-    # IA já terminou de "pensar", faz a jogada
-    print("IA fazendo jogada...")
-    mensagem_status = "IA fazendo jogada..."
-    
-    # Usar MCTS para escolher a melhor jogada
-    jogada = mcts(estado_jogo.clone(), iteracoes=100)
-    pilha, quantidade = jogada
-    
-    print(f"IA escolheu: Pilha {pilha}, Quantidade {quantidade}")
-    mensagem_status = f"IA removeu {quantidade} da pilha {pilha}"
-    
-    # Aplicar a jogada
-    estado_jogo.aplicar_jogada(jogada)
-    jogador_atual = estado_jogo.jogador_atual()
-    
-    # Resetar estado da IA
-    ia_pensando = False
-    timer_ia = 0
-
-def verificar_fim_jogo():
-    global estado_atual, vencedor, mensagem_status
-    
-    if estado_jogo.fim_de_jogo():
-        vencedor = estado_jogo.vencedor()
-        estado_atual = ESTADO_FIM_JOGO
-        print(f"Profundidade máxima alcançada: {MCTSNode.get_profundidade_maxima()}")
-        print(f"Profundidade média da Arvore: {MCTSNode.get_profundidade_media()}")
-        print(f"Quantidade de buscas: {get_quantidade_de_buscas()}")
-        print(f"Quantidade média de buscas: {quantidade_media_buscas()}")
-        print(f"Profundidade média das buscas: {get_profundidade_media()}")
-
-        MCTSNode.resetar_profundidade_maxima()  # Reseta a profundidade máxima para o próximo jogo
-        MCTSNode.resetar_profundidade_total_iterada()  # Reseta a profundidade total iterada para o próximo jogo
-        MCTSNode.resetar_nos_criados()  # Reseta o número de nós criados para o próximo jogo
-        reset_quantidade_de_buscas()
-        reset_quantidade_de_execucao()
-        reset_profundidade_buscas()
-
-
-        # No NIM misère, quem faz a última jogada perde
-        if vencedor == 2:
-            mensagem_status = "Você perdeu! Fez a última jogada."
-        else:
-            mensagem_status = "Você ganhou! A IA fez a última jogada."
-        
-        return True
-    return False
-
-INPUT_RECT = pygame.Rect(180, 160, 280, 50)
-
-num_elementos = 11
-input_ativo = False
-input_buffer = ''
-
-def abrir_tela():
-    global quem_joga, num_elementos, input_ativo, input_buffer, pilha_selecionada
-    global estado_atual, estado_jogo, jogador_atual, mensagem_status, vencedor
-    global ia_pensando, timer_ia
-    
-    pygame.init()
-    tela = pygame.display.set_mode((600, 400))
-    pygame.display.set_caption('NIM MCTS')
-    fonte = pygame.font.SysFont(None, 32)
-    fonte_menor = pygame.font.SysFont(None, 24)
-    rodando = True
-    cursor_timer = 0
-    cursor_visivel = True
-    clock = pygame.time.Clock()
-      # Reset das variáveis
-    pilha_selecionada = -1
-    estado_atual = ESTADO_INPUT
-    mensagem_status = ""
-    vencedor = None
-    ia_pensando = False
-    timer_ia = 0
-    
-    while rodando:
-        tela.fill(BRANCO)
-        mouse = pygame.mouse.get_pos()
-        
-        # Desenha interface baseada no estado atual
-        if estado_atual == ESTADO_INPUT:
-            desenha_etapa_input(tela, fonte, fonte_menor, input_ativo, num_elementos, input_buffer, cursor_visivel)
-        
-        elif estado_atual == ESTADO_SELECAO_JOGADOR:
-            desenha_etapa_quem_comeca(tela, fonte, mouse, quem_joga)
-        
-        elif estado_atual == ESTADO_JOGO:
-            # Desenha as pilhas
-            pilhas_atuais = estado_jogo.pilhas
-            mouse_sobre_pilha, elementos_destacados = desenha_pilhas(tela, pilhas_atuais)
-            
-            # Desenha informações do jogo
-            if jogador_atual == 1:
-                if mouse_sobre_pilha and elementos_destacados > 0:
-                    pilha_idx, _ = get_pilha_e_quantidade_mouse(pilhas_atuais, mouse[0], mouse[1])
-                    instrucao_txt = fonte_menor.render(f"Remover {elementos_destacados} elemento(s) da pilha {pilha_idx} - Clique para confirmar", True, PRETO)
-                else:
-                    instrucao_txt = fonte_menor.render("Sua vez! Passe o mouse sobre uma pilha e clique para jogar", True, PRETO)
-            else:
-                instrucao_txt = fonte_menor.render("Vez da IA", True, PRETO)
-            tela.blit(instrucao_txt, (50, 30))
-            
-            # Desenha mensagem de status
-            if mensagem_status:
-                status_txt = fonte_menor.render(mensagem_status, True, PRETO)
-                tela.blit(status_txt, (50, 10))
-        
-        elif estado_atual == ESTADO_FIM_JOGO:
-            # Desenha as pilhas vazias
-            pilhas_atuais = estado_jogo.pilhas
-            desenha_pilhas(tela, pilhas_atuais)
-            
-            # Desenha mensagem de fim de jogo
-            fim_txt = fonte.render("FIM DE JOGO!", True, VERMELHO)
-            tela.blit(fim_txt, (200, 50))
-            
-            resultado_txt = fonte_menor.render(mensagem_status, True, PRETO)
-            tela.blit(resultado_txt, (150, 100))
-            
-            reiniciar_txt = fonte_menor.render("Feche a janela para sair", True, PRETO)
-            tela.blit(reiniciar_txt, (180, 130))
-        
-        pygame.display.flip()
-        
-        # Processa eventos
-        for evento in pygame.event.get():
-            if evento.type == pygame.QUIT:
-                rodando = False
-            
-            elif estado_atual == ESTADO_INPUT:
-                processar_eventos_input(evento)
-            
-            elif estado_atual == ESTADO_SELECAO_JOGADOR:
-                processar_eventos_selecao_jogador(evento)
-            
-            elif estado_atual == ESTADO_JOGO:
-                processar_eventos_jogo(evento)
-          # Lógica do jogo
-        if estado_atual == ESTADO_JOGO and estado_jogo:
-            # Se é a vez da IA e o jogo não acabou
-            if jogador_atual == 2 and not estado_jogo.fim_de_jogo():
-                if ia_pensando:
-                    # Incrementa o timer da IA
-                    timer_ia += clock.get_time()
-                    if timer_ia >= 1000:  # 4 segundos em milissegundos
-                        fazer_jogada_ia()  # Agora faz a jogada de verdade
-                        verificar_fim_jogo()
-                else:
-                    fazer_jogada_ia()  # Inicia o processo de "pensamento"
-        
-        # Cursor piscando
-        if input_ativo:
-            cursor_timer += clock.get_time()
-            if cursor_timer > 500:
-                cursor_visivel = not cursor_visivel
-                cursor_timer = 0
-        else:
-            cursor_visivel = False
-        
-        clock.tick(60)
-    
-    pygame.quit()
-
-def processar_eventos_input(evento):
-    global input_ativo, input_buffer, num_elementos, estado_atual
-    
-    if evento.type == pygame.MOUSEBUTTONDOWN:
-        if INPUT_RECT.collidepoint(evento.pos):
-            input_ativo = True
-        else:
-            input_ativo = False
-    
-    if input_ativo and evento.type == pygame.KEYDOWN:
-        if evento.key == pygame.K_RETURN:
-            try:
-                if input_buffer:
-                    num_elementos = int(input_buffer)
-                    estado_atual = ESTADO_SELECAO_JOGADOR
-            except:
-                num_elementos = 11
-            input_buffer = ''
-            input_ativo = False
-        elif evento.key == pygame.K_BACKSPACE:
-            input_buffer = input_buffer[:-1]
-        elif evento.unicode.isdigit() and len(input_buffer) < 4:
-            input_buffer += evento.unicode
-
-def processar_eventos_selecao_jogador(evento):
-    global quem_joga, estado_atual, estado_jogo, jogador_atual
-    
-    if evento.type == pygame.MOUSEBUTTONDOWN:
-        if BOTAO_VOCE.collidepoint(evento.pos):
-            quem_joga = 1
-            jogador_atual = 1
-            inicializar_jogo()
-        elif BOTAO_COMP.collidepoint(evento.pos):
-            quem_joga = 2
-            jogador_atual = 2
-            inicializar_jogo()
-
-def processar_eventos_jogo(evento):
-    global pilha_selecionada, estado_atual, jogador_atual, mensagem_status
-    
-    if evento.type == pygame.MOUSEBUTTONDOWN and jogador_atual == 1:
-        # Obter a pilha e quantidade baseada na posição do mouse
-        mouse_x, mouse_y = evento.pos
-        pilha_idx, quantidade = get_pilha_e_quantidade_mouse(estado_jogo.pilhas, mouse_x, mouse_y)
-        
-        if pilha_idx != -1 and quantidade > 0:
-            # Fazer a jogada
-            jogada = (pilha_idx, quantidade)
-            estado_jogo.aplicar_jogada(jogada)
-            
-            mensagem_status = f"Você removeu {quantidade} elemento(s) da pilha {pilha_idx}"
-            print(f"Jogada aplicada: {jogada}")
-            
-            # Resetar seleção
-            pilha_selecionada = -1
-            jogador_atual = estado_jogo.jogador_atual()
-            
-            # Verificar fim de jogo
-            verificar_fim_jogo()
-
-def inicializar_jogo():
-    global estado_jogo, estado_atual
-    
-    # Criar as pilhas baseadas na quantidade de elementos
-    pilhas_iniciais = montar_pilhas_grafico(num_elementos)
-    
-    # Criar o estado do jogo
-    estado_jogo = Estado(pilhas_iniciais, jogador=quem_joga)
-    
-    # Mudar para o estado de jogo
-    estado_atual = ESTADO_JOGO
-    
-    print(f"Jogo iniciado com pilhas: {pilhas_iniciais}")
-    print(f"Primeiro jogador: {quem_joga}")
-
-def montar_pilhas_grafico(quantidade):
-    if quantidade > 80:
-        quantidade = 80
-    if quantidade < 6:
-        return [1, 2, 3]  # Pilhas fixas para valores baixos
-    else:
-        acrescimo = 2
-        current = 5
-        pilhas = []
-                
-        while quantidade > 0:
-            import random
-            if quantidade < 10:
-                elementos_pilha = quantidade
-            else:
-                elementos_pilha = random.randint(5, 10)  # Elementos randômicos entre 5 e 10
-            pilhas.append(elementos_pilha)
-            quantidade -= elementos_pilha
-            
+    def criar_pilhas(self, total):
+        if total < 6: return [1, 2, 3]
+        pilhas, restante = [], total
+        while restante > 0:
+            tamanho = restante if restante < 10 else random.randint(5, 10)
+            pilhas.append(tamanho)
+            restante -= tamanho
         return pilhas
 
-def get_quem_joga():
-    return quem_joga
+    def fazer_jogada(self, pilha, quantidade, eh_humano=True):
+        if eh_humano and (pilha is None or quantidade <= 0): return False
+        
+        jogada = (pilha, quantidade) if eh_humano else mcts(self.estado_jogo.clone(), iteracoes=100)
+        if not eh_humano: time.sleep(0.5)
 
-def get_num_elementos():
-    return num_elementos
+        self.estado_jogo.aplicar_jogada(jogada)
+        self.mensagem = f"{'Você' if eh_humano else 'IA'} removeu {jogada[1]} da pilha {jogada[0]}"
+        self.jogador_atual = self.estado_jogo.jogador_atual()
+        self.verificar_fim()
+        return True
 
-def desenha_etapa_input(tela, fonte, fonte_menor, input_ativo, num_elementos, input_buffer, cursor_visivel):
-    # Texto acima do input
-    instrucao = fonte.render('Informe a quantidade de palitos', True, PRETO)
-    tela.blit(instrucao, (INPUT_RECT.x + 10, INPUT_RECT.y - 40))
-    desenha_input(tela, fonte, INPUT_RECT, 'Total de elementos:', input_ativo, num_elementos, input_buffer, cursor_visivel)
-    # Texto abaixo do input
-    instrucao2 = fonte_menor.render('Confirme pressionando ENTER', True, PRETO)
-    tela.blit(instrucao2, (INPUT_RECT.x + 10, INPUT_RECT.y + INPUT_RECT.height + 10))
+    def verificar_fim(self):
+        if self.estado_jogo and self.estado_jogo.fim_de_jogo():
+            vencedor = self.estado_jogo.vencedor()
+            self.mensagem = "Você perdeu!" if vencedor == 2 else "Você ganhou!"
+            self.estado = "fim"
+            
+            # Exibe e reseta as estatísticas no console
+            print("--- Fim de Jogo: Estatísticas MCTS ---")
+            print(f"Profundidade máxima: {MCTSNode.get_profundidade_maxima()}")
+            print(f"Profundidade média da árvore: {MCTSNode.get_profundidade_media()}")
+            print(f"Quantidade de buscas: {get_quantidade_de_buscas()}")
+            print(f"Média de buscas: {quantidade_media_buscas()}")
+            print(f"Profundidade média das buscas: {get_profundidade_media()}")
+            print("------------------------------------")
+            
+            MCTSNode.resetar_profundidade_maxima()
+            MCTSNode.resetar_profundidade_total_iterada()
+            MCTSNode.resetar_nos_criados()
+            reset_quantidade_de_buscas()
+            reset_quantidade_de_execucao()
+            reset_profundidade_buscas()
 
-def desenha_etapa_quem_comeca(tela, fonte, mouse, quem_joga):
-    hover_voce = BOTAO_VOCE.collidepoint(mouse)
-    hover_comp = BOTAO_COMP.collidepoint(mouse)
-    texto = fonte.render('Quem começa o jogo:', True, PRETO)
-    tela.blit(texto, (180, 30))
-    desenha_botao(tela, fonte, BOTAO_VOCE, 'Você', quem_joga==1, hover_voce)
-    desenha_botao(tela, fonte, BOTAO_COMP, 'Computador', quem_joga==2, hover_comp)
+    def processar_eventos(self, evento):
+        if evento.type == pygame.QUIT: return False
+        
+        if self.estado == "input":
+            rect = pygame.Rect(200, 150, 200, 40)
+            if evento.type == pygame.MOUSEBUTTONDOWN:
+                self.input_ativo = rect.collidepoint(evento.pos)
+            elif evento.type == pygame.KEYDOWN and self.input_ativo:
+                if evento.key == pygame.K_RETURN:
+                    if self.input_buffer: self.num_elementos = int(self.input_buffer)
+                    self.estado = "selecao"
+                elif evento.key == pygame.K_BACKSPACE: self.input_buffer = self.input_buffer[:-1]
+                elif evento.unicode.isdigit(): self.input_buffer += evento.unicode
+
+        elif self.estado == "selecao" and evento.type == pygame.MOUSEBUTTONDOWN:
+            if pygame.Rect(150, 180, 120, 50).collidepoint(evento.pos):
+                self.jogador_atual = 1
+                self.estado_jogo = Estado(self.criar_pilhas(self.num_elementos), self.jogador_atual)
+                self.estado = "jogando"
+            elif pygame.Rect(330, 180, 120, 50).collidepoint(evento.pos):
+                self.jogador_atual = 2
+                self.estado_jogo = Estado(self.criar_pilhas(self.num_elementos), self.jogador_atual)
+                self.estado = "jogando"
+
+        elif self.estado == "jogando" and self.jogador_atual == 1 and evento.type == pygame.MOUSEBUTTONDOWN:
+            pilha, quantidade = self.desenhar_pilhas()
+            self.fazer_jogada(pilha, quantidade)
+        
+        elif self.estado == "fim" and evento.type == pygame.MOUSEBUTTONDOWN:
+            self.reiniciar_jogo()
+
+        return True
+
+    def executar(self):
+        rodando = True
+        while rodando:
+            self.tela.fill(BRANCO)
+            
+            if self.estado == "input":a
+                self.desenhar_texto("Quantidade de palitos:", (300, 120), fonte=self.fonte, centro=True)
+                rect = pygame.Rect(200, 150, 200, 40)
+                pygame.draw.rect(self.tela, AZUL if self.input_ativo else CINZA, rect, border_radius=8)
+                self.desenhar_texto(self.input_buffer, (210, 158))
+            elif self.estado == "selecao":
+                self.desenhar_texto("Quem começa?", (300, 120), fonte=self.fonte, centro=True)
+                self.desenhar_botao(pygame.Rect(150, 180, 120, 50), "Você")
+                self.desenhar_botao(pygame.Rect(330, 180, 120, 50), "IA")
+            elif self.estado == "jogando":
+                pilha, qtd = self.desenhar_pilhas()
+                info = self.mensagem
+                if self.jogador_atual == 1:
+                    if pilha is not None and qtd > 0:
+                        info = f"Remover {qtd} da pilha {pilha}"
+                    else:
+                        info = "Sua vez: passe o mouse sobre uma pilha"
+                self.desenhar_texto(info, (20, 20))
+
+                if self.jogador_atual == 2:
+                    self.fazer_jogada(None, None, False)
+            elif self.estado == "fim":
+                self.desenhar_texto("FIM DE JOGO", (300, 150), fonte=self.fonte, centro=True)
+                self.desenhar_texto(self.mensagem, (300, 200), centro=True)
+                self.desenhar_texto("Clique para reiniciar", (300, 250), centro=True)
+
+            for evento in pygame.event.get():
+                rodando = self.processar_eventos(evento)
+
+            pygame.display.flip()
+            self.clock.tick(60)
+        pygame.quit()
+
+def abrir_tela():
+    JogoNim().executar()
