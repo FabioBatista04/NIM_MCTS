@@ -49,7 +49,7 @@ def jogar_terminal(pilhas, quem_joga):
         if quem_joga == "2":
             print("O computador está jogando...")
             estado = Estado(pilhas, 2)
-            jogada = mcts(estado, iteracoes=500000)
+            jogada = mcts(estado, iteracoes=100)
             
             pilhas[jogada[0]] -= jogada[1]
 
@@ -108,7 +108,7 @@ def main():
 def main_simulacao():
     """Executa simulações para testar a IA"""
     print("Executando simulações...")
-    jogar_simulacao(num_partidas=100, iteracoes_mcts=1000)
+    jogar_simulacao(num_partidas=100, iteracoes_mcts=100)
 
 def main_terminal():
     """Executa o jogo no terminal (versão original)"""
