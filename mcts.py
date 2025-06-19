@@ -25,15 +25,10 @@ def mcts(estado, iteracoes=100):
             no = random.choice(no.filhos)
 
         # 3. SIMULAÇÃO - jogar até o fim
-        resultado = no.simular()
+        vencedor = no.simular()
 
         # 4. BACKPROPAGAÇÃO - atualizar estatísticas
-        no.backpropagar(resultado)
-
-    # Escolher a melhor jogada baseada no número de visitas
-    if not raiz.filhos:
-        jogadas = estado.jogadas_possiveis()
-        return random.choice(jogadas) if jogadas else None
+        no.backpropagar(vencedor)
     
     # Escolher o filho mais visitado (estratégia robusta)
     melhor_filho = max(raiz.filhos, key=lambda f: f.visitas)

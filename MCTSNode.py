@@ -27,23 +27,23 @@ class MCTSNode:
             self.filhos.append(filho)
 
     def selecionar_filho(self):
-        # 1. Prioriza filhos nunca visitados
+        # Prioriza filhos nunca visitados
         nao_visitados = [f for f in self.filhos if f.visitas == 0]
         if nao_visitados:
             return random.choice(nao_visitados)
 
-        # 2. UCB1 do ponto de vista **do pai**  (misère ou normal, tanto faz)
-        C         = math.sqrt(2)
-        log_total = math.log(self.visitas + 1)
+        # UCB1
+        constante         = math.sqrt(2) # Raiz quadrada de 2 Saída: 1.4142135623730951
+        log_total = math.log(self.visitas + 1) # log de visitas dando enfase para nós com poucas visitas
 
-        melhor_ucb   = -float("inf")
+        melhor_ucb   = -float("inf") # Inicializa com -infinito
         melhor_filho = None
 
         for filho in self.filhos:
-            win_oponente = filho.vitorias / filho.visitas          # vitórias do adversário
-            exploit      = 1 - win_oponente                        # vitórias do pai
-            explore      = C * math.sqrt(log_total / filho.visitas)
-            ucb          = exploit + explore
+            vitorias_adversario = filho.vitorias / filho.visitas          # vitórias do adversário
+            exploracao_conhecida      = 1 - vitorias_adversario                        # vitórias do pai
+            exploracao_desconhecida      = constante * math.sqrt(log_total / filho.visitas)
+            ucb          = exploracao_conhecida + exploracao_desconhecida
 
             if ucb > melhor_ucb:
                 melhor_ucb, melhor_filho = ucb, filho
@@ -67,14 +67,14 @@ class MCTSNode:
         # Retorna 1 se o jogador atual do nó venceu, 0 caso contrário
         return 1 if vencedor == jogador_atual else 0
 
-    def backpropagar(self, resultado):
+    def backpropagar(self, vencedor):
         self.visitas += 1
-        self.vitorias += resultado
+        self.vitorias += vencedor
         
         if self.pai:
             # O resultado para o pai é o oposto do resultado para o filho
             # Se o filho venceu (resultado=1), o pai perdeu (1-resultado=0)
-            self.pai.backpropagar(1 - resultado)
+            self.pai.backpropagar(1 - vencedor)
 
     @classmethod
     def resetar_profundidade_maxima(cls):
