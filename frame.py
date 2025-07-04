@@ -157,7 +157,7 @@ class JogoNim:
         while rodando:
             self.tela.fill(BRANCO)
             
-            if self.estado == "input":a
+            if self.estado == "input":
                 self.desenhar_texto("Quantidade de palitos:", (300, 120), fonte=self.fonte, centro=True)
                 rect = pygame.Rect(200, 150, 200, 40)
                 pygame.draw.rect(self.tela, AZUL if self.input_ativo else CINZA, rect, border_radius=8)

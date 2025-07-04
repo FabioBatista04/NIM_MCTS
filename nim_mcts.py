@@ -23,17 +23,16 @@ def jogar_simulacao(num_partidas=100, iteracoes_mcts=50):
     vitorias_j2 = 0                     # contador correto
 
     for _ in range(num_partidas):
-        # ① cria um estado NOVO para cada partida
         estado = Estado([1, 3, 5], jogador=random.choice([1, 2]))
 
         while not estado.fim_de_jogo():
-            if estado.jogador_atual() == 2:               # IA (MCTS)
-                # ② passe um CLONE ao MCTS — evita efeitos colaterais
+            if estado.jogador_atual() == 2:               
+                
                 jogada = mcts(estado.clone(), iteracoes=iteracoes_mcts)
-            else:                                         # adversário aleatório
+            else:                                         
                 jogada = estado.jogada_aleatoria()
 
-            estado.aplicar_jogada(jogada)                 # altera o estado real
+            estado.aplicar_jogada(jogada)                 
 
         print(f"Partida finalizada: {estado.pilhas} - Vencedor: Jogador {estado.vencedor()}")
         # ③ regra misère: vencedor() já retorna self.jogador
